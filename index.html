@@ -1,0 +1,48 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>The Hong Kong Open Gov Data Map - by the JMSC at HKU</title>
+<script type="text/javascript" src="http://maps.google.com/maps/api/js?sensor=true"></script>
+<script type="text/javascript" src="http://www.google.com/jsapi?key=ABQIAAAAckkNqcRbL_2X-rzQg5r5DhSNbd1pToKjGgPjTsj00X0gIZMdWRQHIp-hV_0S99bk6yui3Y3LB9XfIA"></script>
+<link rel="stylesheet" type="text/css" href="style.css" media="screen" />
+<link type="text/css" href="/lib/css/ui-lightness/jquery-ui-1.8.18.custom.css" rel="Stylesheet" />
+<script type="text/javascript">
+
+  var _gaq = _gaq || [];
+  _gaq.push(['_setAccount', 'UA-12618513-11']);
+  _gaq.push(['_trackPageview']);
+
+  (function() {
+    var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+    ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+    var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+  })();
+
+</script>
+</head>
+<body scroll="yes" id="body" onresize="resize();" onload="resize();" onfocus="resize();" style="position:relative;overflow:hidden; width :100%;height:100%; padding:0px; margin:0px; border:0px">
+    <div id="panel" style="z-index:0; position:relative; overflow:hidden;">
+	<h1>The Hong Kong Open Gov Data Map</h1>
+	<h2>by the JMSC at HKU</h2>
+	<div id="logo-jmsc"><a href="http://jmsc.hku.hk/"><img src="jmsc_logo.jpg" alt="Journalism and Media Studies Centre, The University of Hong Kong" border="0"/></a></div>
+	<!--a id="button3d" href="javascript:void(0);" onClick="JMSC.show3d();">3D MAP</a> | <a id="button2d" href="javascript:void(0);" onClick="JMSC.show2d();">2D MAP</a-->
+	<span id="status"></span>
+	<div id="controls">
+	</div>
+    </div>
+    <div id="bottom">
+	<div id="sidepanel"></div>
+	<div id="maps" style="z-index:0; position:relative; overflow:hidden; right: 0; height: 100%">
+	    <div id="map2d" style="width:100%;height:100%;"></div>
+	</div>
+    </div>
+</body>
+<script type="text/javascript" src="/lib/js/jquery.min.js"></script>
+<script type="text/javascript" src="/lib/js/jquery-ui.min.js"></script>
+<script type="text/javascript" src="/lib/js/jLog.min.js"></script>
+<script type="text/javascript" src="maps.js"></script>
+<script type="text/javascript" src="layermenu.js"></script>
+<script type="text/javascript" src="dc.js"></script>
+<script type="text/javascript" src="dcca.js"></script>
+<script type="text/javascript" src="init.js"></script>
+</html>

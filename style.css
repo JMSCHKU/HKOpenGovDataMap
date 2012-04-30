@@ -1,0 +1,196 @@
+@font-face { font-family: Roboto; src: url('/lib/fonts/Roboto-Regular.ttf'); }
+@font-face { font-family: Roboto; font-weight: bold; src: url('/lib/fonts/Roboto-Bold.ttf'); }
+@font-face { font-family: Roboto; font-style: italic; src: url('/lib/fonts/Roboto-Italic.ttf'); }
+@font-face { font-family: Roboto; font-weight: bold; font-style: italic; src: url('/lib/fonts/Roboto-BoldItalic.ttf'); }
+body {
+    font-family: Roboto, sans-serif;
+}
+#maps3d, #maps2d, #button3d, #button2d {
+    display: none;
+}
+#maps {
+    height: 100%;
+}
+#bottom {
+    border-top: 1px solid #666;
+}
+#panel {
+    position: absolute;
+    padding: 10px;
+    margin: 0 auto;
+    -moz-border-radius-topleft: 10px;
+    -moz-border-radius-topright: 10px;
+    -webkit-border-radius-topleft: 10px;
+    -webkit-border-radius-topright: 10px;
+    border-radius: 10px 10px 0 0;
+}
+#panel h1, #panel h2 {
+    display: inline;
+    margin: 0;
+    padding: 0;
+}
+#panel h1 {
+    font-size: 1.5em;
+}
+#panel h2 {
+    margin: 0 0 0 4px;
+    font-size: 1.1em;
+    font-weight: normal;
+}
+#panel span {
+    height: 16px;
+}
+#panel span#status {
+    display: block;
+    float: right;
+}
+#sidepanel {
+    width: 160px;
+    height: 0;
+    bottom: 10px;
+    left: 10px;
+    position: absolute;
+    z-index: 10;
+    background-color: #fff;
+    padding: 0;
+}
+#sidepanel h3 {
+    background-color: #000;
+    padding: 2px;
+    margin: 4px 0;
+    color: #fff;
+    font-size: 1em;
+}
+#sidepanel h4 {
+    margin: 0;
+    font-size: 0.9em;
+}
+#sidepanel h5 {
+    margin: 0;
+}
+#logo-jmsc {
+    float: right;
+}
+table.ft-datatable {
+    font-size: 0.9em;
+}
+select {
+    font-size: 1em;
+}
+option {
+    font-size: 1em;
+}
+option.menuHeader {
+    background-color: #000;
+    color: #fff;
+    font-size: 1.2em;
+}
+input.q {
+    font-size: 1.15em;
+    width: 240px;
+}
+input.b {
+    font-size: 1.15em;
+}
+a#reset-map {
+    font-size: 0.8em;
+    margin: 0 0 0 5px;
+}
+.layermenu-container {
+    float: left;
+}
+.legend-container {
+    position: absolute;
+    top: 200px;
+    right: 20px;
+    float: left;
+    z-index: 10;
+}
+.legline {
+    margin: 5px 0;
+}
+.legtext {
+    font-size: 0.7em;
+    padding: 2px 0 0;
+}
+.legunit {
+    font-size: 0.8em;
+    font-weight: bold;
+    text-align: right;
+}
+.sliders-container {
+    margin: 0 0 0 25px;
+    float: left;
+}
+.slitext {
+    font-size: 0.8em;
+    position: relative;
+    float: left;
+}
+.legend {
+    background-color: #CCC;
+    height: 1em;
+    width: 1em;
+    float: left;
+    margin-right: 4px;
+}
+legend {
+    font-size: 0.9em;
+}
+#legend-colors {
+    width: 120px;
+    background-color: #fff;
+}
+.geoparent {
+    color: #000;
+}
+#sidepanel {
+    display: none;
+}
+#sidepanel .stat {
+    text-align: center;
+}
+#sidepanel .stat .figure {
+    display: block;
+    font-size: 1.6em;
+    font-weight: bold;
+}
+#sidepanel .stat .note {
+    display: block;
+    font-size: 0.6em;
+}
+.info {
+    border-top: 1px solid #333;
+    padding: 5px 0 0 0;
+    margin: 5px 0 0 0;
+    overflow-x: hidden;
+    overflow-y: scroll;
+}
+.info-desc {
+    font-size: 0.6em;
+}
+.infowindow h3, .infowindow h4, .infowindow h5 {
+    margin: 0;
+}
+.infowindow h3 {
+    font-size: 0.8em;
+    background-color: #000;
+    padding: 2px;
+    margin: 0 0 2px;
+    color: #fff;
+}
+.infowindow .stat {
+    font-size: 0.8em;
+}
+div.infowindow-val span {
+    font-size: 1.6em;
+    font-weight: bold;
+}
+div.infowindow-chart.popmedianage {
+    min-width: 400px;
+    min-height: 240px;
+}
+div.infowindow-chart.usuallang {
+    min-width: 360px;
+    min-height: 210px;
+}
