@@ -3,7 +3,9 @@ var JMSC = {
     fusionTableId: 3034108,
     fusionTablesSqlApi: "https://fusiontables.googleusercontent.com/fusiontables/api/query?sql=",
     numericalUnits: ["people", "people / km²", "HK$"],
-    layersWithGraphs: ["popmedianage","usuallang"],
+    dateUnits: ["YEAR", "MONTH"],
+    heightUnits: ["FLOORS"],
+    layersWithGraphs: ["popmedianage", "usuallang", "mosagegender", "mosincome", "moshouseholdsize", "moshouseholdincome", "mosedutertiary"],
     months: ["January","February","March","April","May","June","July","August","September","October","November","December"],
     geoid: 0,
     geotype: "dc",
@@ -40,9 +42,9 @@ var JMSC = {
 		{"label": "Hotels", "terms": ["hotel"]},
 	    ],
 	    "address_site": null,
+	    "applicant": null,
 	    "authorized_person": null,
-	    "registered_structural_engineer": null,
-	    "applicant": null
+	    "registered_structural_engineer": null
 	}
     },
     rangeValues: {
@@ -62,7 +64,11 @@ var JMSC = {
 	center: null,
 	id: null
     },
-    year: 2001,
+    geDefaultParams: {
+	range: 3000,
+	tilt: 0
+    },
+    year: "",
     yearSlider: null,
     rangeSlider: null,
     sliderStepPx: 100,
@@ -86,6 +92,8 @@ var JMSC = {
 	preserveViewport: true
     },
     kmlUrl: "",
+    kmlUrlTour: "",
+    kmlTourObj: null,
     openedInfoWindow: null,
     infoWindowOpts: {
 	disableAutoPan: false
@@ -101,20 +109,14 @@ var JMSC = {
 	marker: ["small_blue", "measle_turquoise", "small_green", "small_yellow", "small_red"],
 	marker_hex: ["9999FF", "99FFFF", "99FF99", "FFFF99", "FF6666"]
     },
+    mapTypeIds: [ google.maps.MapTypeId.ROADMAP, 'minimal', google.maps.MapTypeId.SATELLITE ],
     mapStyles: {
 	minimal: [
-	  {
+	  /*{
 	    stylers: [
 	      { visibility: "off" }
 	    ]
-	  },{
-	    featureType: "water",
-	    stylers: [
-	      { visibility: "on" },
-	      { lightness: 50 },
-	      { saturation: -50 }
-	    ]
-	  },{
+	  },*/{
 	    featureType: "administrative",
 	    stylers: [
 	      { visibility: "on" }
@@ -132,13 +134,29 @@ var JMSC = {
 	      { lightness: -40 }
 	    ]
 	  },{
+	    featureType: "water",
+	    stylers: [
+	      { visibility: "on" },
+	      { lightness: 50 },
+	      { saturation: -50 }
+	    ]
+	  },{
 	    featureType: "landscape",
 	    elementType: "labels",
 	    stylers: [
 	      { visibility: "on" }
 	    ]
+	  },{
+	    featureType: "road",
+	    stylers: [
+	      { visibility: "off" }
+	    ]
+	  },{
+	    featureType: "transit",
+	    stylers: [
+	      { visibility: "off" }
+	    ]
 	  }
-
 	]
     },
     styleGradient: false,
@@ -234,10 +252,14 @@ var JMSC = {
 	    mapTypeId: JMSC.overlayStart,
 	    streetViewControl: true,
 	    mapTypeControlOptions: {
-		mapTypeIds: [ google.maps.MapTypeId.ROADMAP, 'minimal' ]
+		mapTypeIds: JMSC.mapTypeIds
+	    },
+	    panControlOptions: {
+		position: google.maps.ControlPosition.LEFT_BOTTOM
 	    },
 	    zoomControlOptions: {
-		style: google.maps.ZoomControlStyle.SMALL
+		style: google.maps.ZoomControlStyle.SMALL,
+		position: google.maps.ControlPosition.LEFT_BOTTOM
 	    }
 	};
 	JMSC.poi.zoom = JMSC.zoomStart;
@@ -250,6 +272,7 @@ var JMSC = {
 	JMSC.kmlLayerOpts.map = JMSC.map;
 	JMSC.mode3d = false;
 	if (JMSC.atInit) {
+	    //JMSC.map.setMapTypeId(google.maps.MapTypeId.ROADMAP);
 	    JMSC.load2d();
 	}
 	google.maps.event.addListener(JMSC.map, 'bounds_changed', JMSC.updatePlacesMenu);
@@ -261,6 +284,20 @@ var JMSC = {
 	JMSC.showLoadingBar();
 	JMSC.unload2d();
 	JMSC.kmlUrl = JMSC.baseUrlKml + JMSC.currentLayerId + ".kmz";
+	if (JMSC.currentLayerData.maptype !== undefined && JMSC.currentLayerData.maptype == "SATELLITE" &&
+	    JMSC.currentLayerData.rotate !== undefined && JMSC.currentLayerData.rotate) {
+	    JMSC.kmlUrl = JMSC.baseUrlKml + JMSC.currentLayerId + "_rotate.kmz";
+	}
+	$.log(JMSC.kmlUrl);
+	$.log(JMSC.currentLayerId);
+	if (JMSC.currentLayerData.place !== undefined) {
+	    if (JMSC.poi.id !== JMSC.currentLayerData.place) {
+	       	var found = JMSC.zoomToPlace();
+		JMSC.kmlLayerOpts.preserveViewport = found;
+	    }
+	} else {
+	    JMSC.kmlLayerOpts.preserveViewport = false;
+	}
        	JMSC.loadedLayer = new google.maps.KmlLayer(JMSC.kmlUrl, JMSC.kmlLayerOpts);
 	google.maps.event.addListener(JMSC.loadedLayer, 'click', JMSC.clickKmlLayer);
 	JMSC.hideLoadingBar();
@@ -311,11 +348,12 @@ var JMSC = {
 	$.log("Success creating GEarth instance");
 	JMSC.ge_ready = true;
 	JMSC.ge = instance;
+	JMSC.loadGeOptions();
 	JMSC.mode3d = true;
 	JMSC.ge.getWindow().setVisibility(true);
-	JMSC.loadGeOptions();
 	JMSC.load3d();
 	$.log("API version: " + JMSC.ge.getApiVersion());
+	//google.earth.addEventListener(JMSC.ge, 'frameend', JMSC.geFrameEnd);
     },
     plainFailureCB: function(errorCode) {
 	JMSC.failure3dCB(errorCode);
@@ -324,6 +362,10 @@ var JMSC = {
 	    JMSC.show2d();
 	    JMSC.atInit = false;
 	}
+    },
+    geFrameEnd: function(e) {
+	$.log("finish viewport rendering");
+	$.log(e);
     },
     loadGeOptions: function() {
 	var lookAt = JMSC.ge.getView().copyAsLookAt(JMSC.ge.ALTITUDE_RELATIVE_TO_GROUND);
@@ -334,6 +376,7 @@ var JMSC = {
 
 	/* Set options */
 	var options = JMSC.ge.getOptions();
+	options.setFlyToSpeed(1.0);//JMSC.ge.SPEED_TELEPORT);
 	options.setStatusBarVisibility(1);
 	options.setGridVisibility(0);
 	options.setOverviewMapVisibility(0);
@@ -350,29 +393,56 @@ var JMSC = {
     },
     load3d: function() {
 	$.log("load3d");
-	JMSC.atInit = false;
 	//JMSC.unload3d();
 	JMSC.showLoadingBar();
-	JMSC.kmlUrl = JMSC.baseUrlKml + JMSC.currentLayerId + ".kmz";
-	//$.log(JMSC.kmlUrl);
+	JMSC.kmlUrl = JMSC.baseUrlKml + JMSC.currentLayerId + ".kmz" + "?r=" + parseInt(Math.random()*100000000000000000);;
+	$.log(JMSC.kmlUrl);
+	if (JMSC.currentLayerData.tour && JMSC.currentLayerData.tourkml) {
+	    JMSC.kmlUrlTour = JMSC.kmlUrl;
+	    JMSC.kmlUrl = JMSC.baseUrlKml + JMSC.currentLayerData.tourkml + ".kmz" + "?r=" + parseInt(Math.random()*100000000000000000);;
+	}
 	google.earth.fetchKml(JMSC.ge, JMSC.kmlUrl, function(kmlObject) {
 	    if (kmlObject) {
-		JMSC.unload3d();
-		if ('getFeatures' in kmlObject) {
-		    kmlObject.getFeatures().appendChild(kmlObject);
+		if (JMSC.currentLayerData.tour == undefined) {
+		    JMSC.unload3d();
 		}
+		/*if ('getFeatures' in kmlObject) {
+		    kmlObject.getFeatures().appendChild(kmlObject);
+		}*/
 		JMSC.loadedKml3d = kmlObject;
 		JMSC.ge.getFeatures().appendChild(kmlObject);
-		if (kmlObject.getAbstractView()) {
-		    JMSC.ge.getView().setAbstractView(kmlObject.getAbstractView());
-		} else {
-		    JMSC.zoomToPlace();
+		var currentRange = JMSC.ge.getView().copyAsLookAt(JMSC.ge.ALTITUDE_ABSOLUTE).getRange();
+		var placeRange = JMSC.geDefaultParams.range;
+		if (JMSC.currentLayerData.place !== undefined && JMSC.currentLayerData.place.range !== undefined) {
+		    placeRange = JMSC.currentLayerData.place.range;
+		}
+		if (kmlObject.getAbstractView() !== null && JMSC.currentLayerData.place == undefined) {
+		    $.log("1");
+	    	    JMSC.ge.getView().setAbstractView(kmlObject.getAbstractView());
+		} else if (JMSC.currentLayerData.place !== undefined && currentRange > placeRange) {
+		    $.log("2");
+		    setTimeout("JMSC.zoomToPlace();",3000);
+		} else if (currentRange > placeRange) {
+		    $.log("3");
+		    if (kmlObject.getAbstractView()) {
+	    		JMSC.ge.getView().setAbstractView(kmlObject.getAbstractView());
+    		    }
 		}
 		JMSC.hideLoadingBar();
 	    } else {
 		JMSC.hideLoadingBar();
 	    }
+	    JMSC.atInit = false;
 	});
+	if (JMSC.currentLayerData.tour !== undefined && JMSC.kmlUrlTour !== undefined) {
+	    $.log(JMSC.currentLayerData.tour);
+	    google.earth.fetchKml(JMSC.ge, JMSC.kmlUrlTour, function(kmlObject) {
+		JMSC.kmlTourObj = kmlObject;
+		setTimeout("JMSC.ge.getTourPlayer().setTour(JMSC.kmlTourObj); JMSC.ge.getTourPlayer().play();",5000);
+    		/*JMSC.ge.getTourPlayer().setTour(kmlObject);
+		JMSC.ge.getTourPlayer().play();*/
+	    });
+	}
     },
     unload3d: function() {
 	 if(JMSC.ge==null) return 0;
@@ -381,10 +451,25 @@ var JMSC = {
 	 }
      },
     showLoadingBar: function() {
-	$("#status").innerHTML = JMSC.loadingBarHTML;
+	$("#status").html(JMSC.loadingBarHTML);
     },
     hideLoadingBar: function() {
-	$("#status").innerHTML = "";
+	$("#status").html("");
+    },
+    setMapType: function() {
+	if (JMSC.currentLayerData.maptype !== undefined) {
+	    var currentMapType = JMSC.map.getMapTypeId();
+	    var newMapType = JMSC.currentLayerData.maptype;
+	    if (newMapType.search(/^[A-Z]+$/)>=0) {
+		newMapType = google.maps.MapTypeId[newMapType];
+	    }
+	    JMSC.map.setMapTypeId(newMapType);
+	} else {
+	    var currentMapType = JMSC.map.getMapTypeId();
+	    if (currentMapType !== "minimal") {
+		JMSC.map.setMapTypeId('minimal');
+	    }
+	}
     },
     updatePlacesMenu: function() {
 	if (JMSC.poi.center !== undefined && JMSC.poi.center !== null) {
@@ -592,7 +677,7 @@ var JMSC = {
 	    height: '0'
 	}, 500);*/
 	sp.hide();
-	sp.css("height", "0");
+	/*sp.css("height", "0");*/
 	sp.css("padding", "0");
     },
     openSidePanel: function(w,h) {
@@ -603,7 +688,7 @@ var JMSC = {
 	/*sp.animate({
 	    height: '120'
 	}, 500);*/
-	sp.css("height", h);
+	/*sp.css("height", h);*/
 	sp.show();
     },
     fillSidePanel: function(o) {
@@ -611,8 +696,8 @@ var JMSC = {
 	sp.html("");
 	switch (JMSC.currentSection) {
 	    case "buildings":
-		var cols = ["address_firstrow", "occupation_permit", "occupation_permit_type", "gross_floor_area_domestic", "gross_floor_area_nondomestic", "usable_floor_area_domestic", "usable_floor_area_non_domestic", "applicant", "authorized_person", "registered_structural_engineer"];
-		var colnames = ["Short address", "Occupation Permit #", "Permit type", "Gross floor area (domestic)", "Gross floor area (non-domestic)", "Usable floor area (domestic)", "Usable floor area (non-domestic)", "Applicant", "Authorized Person", "Registered Structural Engineer"];
+		var cols = ["address_firstrow", "occupation_permit", "occupation_permit_type", "gross_floor_area_domestic", "gross_floor_area_nondomestic", "usable_floor_area_domestic", "usable_floor_area_non_domestic"];//, "applicant", "authorized_person", "registered_structural_engineer"];
+		var colnames = ["Short address", "Occupation Permit #", "Permit type", "Gross floor area (domestic)", "Gross floor area (non-domestic)", "Usable floor area (domestic)", "Usable floor area (non-domestic)"];//, "Applicant", "Authorized Person", "Registered Structural Engineer"];
 		JMSC.openSidePanel(220,280);
 		sp.append($("<h3>Building details</h3>"));
 		var ul = $('<ul class="bd-infos"></ul>');
@@ -788,8 +873,29 @@ var JMSC = {
 	    }
 	});
     },
+    loadInfoWindowStreetView: function(o) {
+	switch (JMSC.currentSection) {
+	    case "lands":
+	    case "tpb":
+		var div_sv = document.getElementById("infowindow-streetview-" + JMSC.thisLayer);
+		var svopts = {
+		    position: o.latLng,
+		    pov: {
+			heading: 30,
+			pitch: 10,
+			zoom: 1
+		    },
+		    visible: true
+		};
+		div_sv.style.height = "300px";
+		var pano = new google.maps.StreetViewPanorama(div_sv, svopts);
+		$.log(pano);
+	    break;
+	}
+    },
     loadInfoWindowGraph: function(o) {
 	var out = "";
+	//$.log(JMSC.thisLayer);
 	switch (JMSC.currentSection) {
 	    case "buildings":
 		break;
@@ -824,7 +930,6 @@ var JMSC = {
 			break;
 		    case "eduattend":
 		    case "edutertiary":
-		    case "mosedutertiary":
 			var d = new google.visualization.DataTable();
 			d.addColumn('string', 'Usual language');
 			d.addColumn('number', '%');
@@ -869,6 +974,78 @@ var JMSC = {
 			o.height = 240;
 			viz.draw(d, o); 
 			break;
+		    case "mosagegender":
+		    case "mosedutertiary":
+		    case "mosincome":
+		    case "moshouseholdsize":
+		    case "moshouseholdincome":
+			var d = new google.visualization.DataTable();
+			d.addColumn('string', 'Bracket');
+			d.addColumn('number', '%');
+			JMSC.showLoadingBar();
+			var prefix = "prop_working_pop_monthly_income_";
+			var brackets = ["7500less", "7500_9999", "10000_14999", "15000_19999", "20000_29999", "30000_39999", "40000plus"];
+			var chartTitle = "Income from main employment";
+			var chartTitle = "Proportion of working population by monthly income from main employment";
+			var popcol = "working_pop";
+			if (JMSC.thisLayer == "moshouseholdsize") {
+			    prefix = "household_size_";
+			    brackets = ["1_3", "4", "5plus"];
+			    chartTitle = "Proportion of domestic household by household size";
+			    popcol = "household";
+			} else if (JMSC.thisLayer == "moshouseholdincome") {
+			    prefix = "prop_domestic_household_income_";
+			    brackets = ["10000less", "10000_19999", "20000_29999", "30000_39999", "40000_49999", "50000_59999", "60000plus"];
+			    chartTitle = "Proportion of domestic household by monthly domestic household income";
+			    popcol = "household";
+			} else if (JMSC.thisLayer == "mosedutertiary") {
+			    prefix = "edu_";
+			    brackets = ["primary", "secondary", "postsecondary"];
+			    chartTitle = "Proportion of population aged 15 and over by educational attainment (highest level attended)";
+			    popcol = "student";
+			} else if (JMSC.thisLayer == "mosagegender") {
+			    prefix = "age_";
+			    brackets = ["15less", "15_24", "25_34", "35_44", "45_54", "55_64", "65plus"];
+			    chartTitle = "Percentage distribution by age group";
+			    popcol = "population";
+			}
+			for (var i=0; i<brackets.length; i++) {
+			    var l = prefix + brackets[i];
+			    //$.log(l);
+			    //$.log(o["row"][l]);
+			    var v = parseFloat(o["row"][l]["value"]);
+			    if (v !== undefined && v != null) {
+				//$.log(v);
+				if (typeof v == 'string') v = v.replace("-","0.0");
+				v = 1.0 * v;
+				//v = 100.0 * v;
+				/*v = "" + v
+				v = v1.substr(0, 4);*/
+				var lbl = brackets[i].replace("less","-").replace("plus","+").replace("_","-");//.replace(/^/,"$");
+				if (JMSC.thisLayer.indexOf("income")>=0) lbl.replace(/^/,"$");
+				var r = [lbl, v];
+				d.addRow(r);
+			    }
+			}
+			var viz = new google.visualization.BarChart(document.getElementById(JMSC.thisLayer + '-chart'));
+			var o = JMSC.infostyles.optsInfoWindowBase;
+			o.vAxis = {
+			};
+			o.hAxis = {
+			    maxValue: 40,
+			    minValue: 0,
+			    title: chartTitle
+			};
+			o.isStacked = true;
+			o.width = 320;
+			o.height = 120;
+			o.chartArea.left = 60;
+			o.chartArea.right = 20;
+			o.chartArea.bottom = 20;
+			o.chartArea.height = 90;
+			viz.draw(d, o); 
+			JMSC.hideLoadingBar();
+			break;
 		    default:
 			break;
 		} // end inside switch (current layer)
@@ -881,19 +1058,116 @@ var JMSC = {
 	var geocol = "location";
 	if (JMSC.currentLayerData.geocolname !== undefined) geocol = JMSC.currentLayerData.geocolname;
 	var sql = "SELECT * FROM " + JMSC.fusionTableId + " WHERE ";
-	sql += "ST_INTERSECTS(" + geocol + ",CIRCLE(LATLNG("+lat+","+lng+"),10))"
+	if (JMSC.currentSection == "lands") {
+	    //sql += "ST_INTERSECTS('<Point><coordinates>'||lng||','||lat||'</coordinates></Point>', CIRCLE(LATLNG(" + lat + "," + lng + "),1000))";
+	    var sortkey = "stt_no";
+	    if (JMSC.currentLayerData.sortkey !== undefined) sortkey = JMSC.currentLayerData.sortkey;
+	    sql += sortkey + " = '" + o.row[sortkey]["value"] + "'";
+	} else {
+	    sql += "ST_INTERSECTS(" + geocol + ",CIRCLE(LATLNG("+lat+","+lng+"),50))";
+	}
+	if (JMSC.currentLayerData.sortkey !== undefined) {
+	    sql += " ORDER BY " + JMSC.currentLayerData.sortkey;
+	    if (JMSC.currentLayerData.sortorder !== undefined) {
+		sql += " " + JMSC.currentLayerData.sortorder;
+	    }
+	}
 	sql += "&jsonCallback=?"
 	sql = sql.replace(/ /g,"+");
+	$.log(sql);
 	$.ajax({
 	    url: JMSC.fusionTablesSqlApi + encodeURI(sql),
 	    dataType: "jsonp",
 	    crossDomain: true,
 	    success: function(r) {
 		$.log(r);
+    		var infoWindowOpts = JMSC.infoWindowOpts;
+		var infoWindowContent = "";
+		var geocol = "point";
+		if (JMSC.currentLayerData.geocolname !== undefined) geocol = JMSC.currentLayerData.geocolname;
+		var cols = r.table.cols;
+		var rows = r.table.rows;
+		var geocolid = -1;
+		colkeys = {};
+		for (var i=0; i<cols.length; i++) {
+		    if (cols[i] == geocol) {
+			geocolid = i;
+		    }
+		    colkeys[cols[i]] = i;
+		}
+		switch (JMSC.currentSection) {
+		    case "tpb":
+			var app_caseno_i = JMSC.findIndexFromValue("APP_CASENO", cols);
+			for (var i=0; i<rows.length; i++) {
+			    var itemContent = "";
+			    itemContent += '<h3>' + rows[i][colkeys["APP_CASENO"]] + '</h3>';
+			    itemContent += '<ul>';
+			    if (rows[i][colkeys["DECISION"]].indexOf("Invalid application")>=0) {
+				itemContent += "<li>Decision: " + rows[i][colkeys["DECISION"]] + "</li>";
+			    } else {
+				itemContent += "<li>Address: " + rows[i][colkeys["ENG_LOC"]] + "<br/>" + rows[i][colkeys["CHI_LOC"]] + "</li>";
+				itemContent += "<li>Receiving date: " + rows[i][colkeys["RECEIVING_DATE"]] + "</li>";
+				itemContent += "<li>Meeting date: " + rows[i][colkeys["DATE_MEET"]] + "</li>";
+				itemContent += "<li>Decision: " + rows[i][colkeys["DECISION"]] + "</li>";
+				itemContent += "<li>Authority: " + rows[i][colkeys["Authority"]] + "</li>";
+				if (colkeys["With Gist Info."] >= 0 && rows[i][colkeys["With Gist Info."]]) {
+				    itemContent += "<li>Current zoning: " + rows[i][colkeys["ZONING_DESC_E"]] + "</li>";
+				    itemContent += "<li>Applied zoning: " + rows[i][colkeys["ENG_APLD_USE"]] + "</li>";
+				    if (colkeys["SITE_AREA"] >= 0 && rows[i][colkeys["SITE_AREA"]]) {
+					itemContent += "<li>Site area: " + rows[i][colkeys["SITE_AREA"]] + "</li>";
+				    }
+				    if (colkeys["DOM_GFA"] >= 0 && rows[i][colkeys["DOM_GFA"]]) {
+					itemContent += "<li>Domestic gross floor area: " + JMSC.numberWithCommas(rows[i][colkeys["DOM_GFA"]]) + "</li>";
+				    }
+				    if (colkeys["NONDOM_GFA"] >= 0 && rows[i][colkeys["NONDOM_GFA"]]) {
+					itemContent += "<li>Non-domestic gross floor area: " + JMSC.numberWithCommas(rows[i][colkeys["NONDOM_GFA"]]) + "</li>";
+				    }
+				}
+			    }
+			    itemContent += '</ul>';
+			    infoWindowContent += '<div class="item">' + itemContent + '</div>';
+			}
+			break;
+		    case "lands":
+			for (var i=0; i<rows.length; i++) {
+			    var itemContent = "";
+			    itemContent += '<h3>' + rows[i][colkeys["stt_no"]] + '</h3>';
+			    itemContent += '<ul>';
+			    itemContent += "<li>Location: " + rows[i][colkeys["location"]] + "</li>";
+			    itemContent += "<li>Proposed Site Area: " + JMSC.numberWithCommas(rows[i][colkeys["proposed_site_area"]]) + " m²</li>";
+			    itemContent += "<li>Proposed Term: " + rows[i][colkeys["proposed_term"]] + "</li>";
+			    itemContent += "<li>Proposed User: " + rows[i][colkeys["proposed_user"]] + "</li>";
+			    itemContent += "<li>Proposed Invitation Date: " + rows[i][colkeys["proposed_invitation_date"]] + "</li>";
+			    itemContent += '</ul>';
+			    infoWindowContent += '<div class="item">' + itemContent + '</div>';
+                       }
+		       break;
+		}
+		infoWindowContent = '<div id="infowindow-streetview-'+ JMSC.thisLayer +'" class="infowindow-streetview"></div>' + infoWindowContent;
+		infoWindowOpts.content = '<div class="infowindow">' + infoWindowContent + "</div>";
+		infoWindowOpts.pixelOffset = o["pixelOffset"];
+		infoWindowOpts.position = o["latLng"];
+		if (JMSC.openedInfoWindow != null) {
+		    JMSC.openedInfoWindow.close();
+		}
+		JMSC.openedInfoWindow = new google.maps.InfoWindow(infoWindowOpts);
+		JMSC.openedInfoWindow.open(JMSC.map);
+		google.maps.event.addListener(JMSC.openedInfoWindow, 'domready', function() {
+		    //JMSC.loadInfoWindowGraph(o);
+		    JMSC.loadInfoWindowStreetView(o);
+		    JMSC.hideLoadingBar();
+		});
+		google.maps.event.addListener(JMSC.openedInfoWindow, 'closeclick', function() {
+		    JMSC.closeSidePanel();
+		    //JMSC.clearBounds(null);
+		    JMSC.resetGeoIds();
+		    //JMSC.clearBB();
+		});
 	    }
 	});
     },
     loadBuildingBlockData: function(o) {
+	JMSC.showLoadingBar();
 	var lat = o.latLng.lat();
 	var lng = o.latLng.lng();
 	var sql = "SELECT * FROM " + JMSC.fusionTableId + " WHERE ";
@@ -920,57 +1194,74 @@ var JMSC = {
 		    }
 		}
 		JMSC.clearBB();
-		for (var i=0; i<rows.length; i++) {
-		    var geo = rows[i][geocolid];
-		    var coor = rows[i][geocolid].coordinates;
-		    var type = rows[i][geocolid].type;
-		    var lat = coor[1];
-		    var lng = coor[0];
-		    /*$.log(lat);
-		    $.log(lng);
-		    $.log(type);
-		    break;*/
-		    var latLng = new google.maps.LatLng(lat, lng);
-		    var marker = new google.maps.Marker({
-			position: latLng,
-			title: rows[i][0]
-		    });
-			//map: JMSC.map,
-		    marker.setMap(JMSC.map);
-		    JMSC.bbmarkers.push(marker);
+		if (JMSC.currentLayerData.ftcol !== undefined && JMSC.currentLayerData.ftcol.match(/[A-Z]+/)==undefined) {
+		    for (var i=0; i<rows.length; i++) {
+			var geo = rows[i][geocolid];
+			var coor = rows[i][geocolid].coordinates;
+			var type = rows[i][geocolid].type;
+			var lat = coor[1];
+			var lng = coor[0];
+			/*$.log(lat);
+			$.log(lng);
+			$.log(type);
+			break;*/
+			var latLng = new google.maps.LatLng(lat, lng);
+			var marker = new google.maps.Marker({
+			    position: latLng,
+			    title: ""+rows[i][0]
+			});
+			    //map: JMSC.map,
+			marker.setMap(JMSC.map);
+			JMSC.bbmarkers.push(marker);
+		    }
 		}
 		if (JMSC.geotype !== null) {
 		    infoWindowContent += "<h3>" + JMSC.geotypenames[JMSC.geotype] + "</h3>";
 		    infoWindowContent += '<h4 class="bb">' + JMSC.geoname + "</h4>";
-		}
-		infoWindowContent += "<em>This building</em>"
-		infoWindowContent += "<ul>"
-		if (o.row["ERECT_DATE"]["value"].indexOf("111101") != 0) {
-		    var month = o.row["ERECT_DATE"]["value"];
-		    month = JMSC.months[Number(month) % 100 - 1].substring(0,3) + "&nbsp;" + Math.floor(month / 100);
-		    //infoWindowContent += "<li>ERECT_DATE: " + o.row["ERECT_DATE"]["value"].substring(0,4) + "-" + o.row["ERECT_DATE"]["value"].substr(4,2) + "</li>"
-		    infoWindowContent += "<li>ERECT_DATE: " + month + "</li>"
-		}
-		infoWindowContent += "<li>STOREYS: " + o.row["STOREYS"]["value"] + "</li>"
-		infoWindowContent += "<li>LQ_CNT: " + o.row["LQ_CNT"]["value"] + "</li>"
-		infoWindowContent += "<li>BLDG_TYPE: " + o.row["BLDG_TYPE"]["value"] + "</li>"
-		infoWindowContent += "</ul>"
-		infoWindowContent += "<hr/>"
-		infoWindowContent += "<em>Entire block</em>"
-		var population_nb = "";
-		if (o["row"]["population"] !== undefined) {
-		    population_nb = o["row"]["population"]["value"].split(".")[0];
 		}
 		var ftcol = JMSC.currentLayerData.ftcol.replace(/[_\-]*/,"");
 		var layertitle = JMSC.currentLayerData["nameen"];
 		var value = Number(o["row"][ftcol]["value"]);
 		var unit = "";
 		if (JMSC.currentLayerData["unit"]) unit = JMSC.currentLayerData["unit"];
+		infoWindowContent += "<em>This building</em>"
+		if (JMSC.currentLayerData.ftcol !== undefined && JMSC.currentLayerData.ftcol.match(/[A-Z]+/)==undefined) {
+		    infoWindowContent += "<ul>"
+		    if (o.row["ERECT_DATE"]["value"].indexOf("111101") != 0) {
+			var month = o.row["ERECT_DATE"]["value"];
+			month = JMSC.numMonthToTextMonth(month);
+			//infoWindowContent += "<li>ERECT_DATE: " + o.row["ERECT_DATE"]["value"].substring(0,4) + "-" + o.row["ERECT_DATE"]["value"].substr(4,2) + "</li>"
+			infoWindowContent += "<li>ERECT_DATE: " + month + "</li>"
+		    }
+		    infoWindowContent += "<li>STOREYS: " + o.row["STOREYS"]["value"] + "</li>"
+		    infoWindowContent += "<li>LQ_CNT: " + o.row["LQ_CNT"]["value"] + "</li>"
+		    infoWindowContent += "<li>BLDG_TYPE: " + o.row["BLDG_TYPE"]["value"] + "</li>"
+		    infoWindowContent += "</ul>"
+		    infoWindowContent += "<hr/>"
+		    infoWindowContent += "<em>Entire block</em>"
+		}
 		if ($.inArray(unit, JMSC.numericalUnits)>=0) value = addCommas(value);
+		var population_nb = "";
+		if (o["row"]["population"] !== undefined) {// && $.inArray(unit, JMSC.dateUnits)<0 && $.inArray(unit, JMSC.heightUnits)<0) {
+		    population_nb = o["row"]["population"]["value"].split(".")[0];
+		}
+		if ($.inArray(unit, JMSC.dateUnits)>=0) {
+		    if (unit == "MONTH") {
+			if (value == "111101") value = "N/A";
+			else value = JMSC.numMonthToTextMonth(value);
+		    }
+		    unit = "(" + unit.toLowerCase() + ")";
+		}
+		if ($.inArray(unit, JMSC.heightUnits)>=0) {
+		    unit = unit.toLowerCase();
+		    if (value == "1" || value == 1) {
+			unit = unit.substring(0, length(value)-1);
+		    }
+		}
 		infoWindowContent += "<h5>" + layertitle + "</h5>";
 		infoWindowContent += '<div class="infowindow-val"><span>'+ value +'</span> ' + unit + '</div>';
 		if (population_nb.length > 0) {
-		    infoWindowContent += '<div class="stat"><span class="note" title="Population in building block in 2006">2006 pop</span>: <span class="figure">' + addCommas(population_nb) + '</span></div>';
+		    infoWindowContent += '<div class="stat"><span class="note" title="Population in building block in 2006">2006 pop (entire block)</span>: <span class="figure">' + addCommas(population_nb) + '</span></div>';
 		}
 		if ($.inArray(JMSC.thisLayer, JMSC.layersWithGraphs)>=0) {
 		    infoWindowContent += '<div id="'+JMSC.thisLayer+'-chart" class="infowindow-chart '+JMSC.thisLayer+'"></div>';
@@ -985,6 +1276,7 @@ var JMSC = {
 		JMSC.openedInfoWindow.open(JMSC.map);
 		google.maps.event.addListener(JMSC.openedInfoWindow, 'domready', function() {
 		    JMSC.loadInfoWindowGraph(o);
+		    JMSC.hideLoadingBar();
 		});
 		google.maps.event.addListener(JMSC.openedInfoWindow, 'closeclick', function() {
 		    JMSC.closeSidePanel();
@@ -995,6 +1287,9 @@ var JMSC = {
 	    }
 	});
     },
+    numMonthToTextMonth: function(month) {
+	return JMSC.months[Number(month) % 100 - 1].substring(0,3) + "&nbsp;" + Math.floor(month / 100);
+    },
     loadInfoWindow: function(o) {
 	$.log(o);
 	if (JMSC.currentLayerData == null) return 0;
@@ -1004,6 +1299,7 @@ var JMSC = {
 	    infoWindowContent += "<h3>" + JMSC.geotypenames[JMSC.geotype] + "</h3>";
 	    infoWindowContent += "<h4>" + JMSC.geoname + "</h4>";
 	}
+	JMSC.showLoadingBar();
 	switch (JMSC.currentSection) {
 	    case "buildings":
 		var section_title = "";
@@ -1090,8 +1386,9 @@ var JMSC = {
 			digest_link += "_revised";
 		    }
 	    	    digest_link += ".pdf";
-		    month = JMSC.months[Number(months[oii] % 100)-1].substring(0,3) + "&nbsp;" + Math.floor(months[oii] / 100);
-		    infoWindowContent += '<tr id="bd-' + ids[oii] + '" class="bd"><td class="address"><a href="javascript:void(0);" onclick="JMSC.buildingDetails('+section_id+','+ids[oii]+');" id="bldg-' + ids[oii] + '">' + addresses[oii] + '</a></td><td class="month"><a href="'+digest_link+'" target="_blank">' + month + '</a></td><td class="building-type">' + building_types[oii] + '</td>' + bldg_costs_html + '</tr>';
+		    //month = JMSC.months[Number(months[oii] % 100)-1].substring(0,3) + "&nbsp;" + Math.floor(months[oii] / 100);
+		    month_str = JMSC.numMonthToTextMonth(months[oii]);
+		    infoWindowContent += '<tr id="bd-' + ids[oii] + '" class="bd"><td class="address"><a href="javascript:void(0);" onclick="JMSC.buildingDetails('+section_id+','+ids[oii]+');" id="bldg-' + ids[oii] + '">' + addresses[oii] + '</a></td><td class="month">' + month_str + '</td><td class="building-type">' + building_types[oii] + '</td><td><a href="'+digest_link+'" target="_blank">PDF</a></td>' + bldg_costs_html + '</tr>';
 		    res_valid.push(ids[oii]);
 		}
 		if (res_valid.length>1) {
@@ -1101,7 +1398,13 @@ var JMSC = {
 		    res_str = "result";
 		    JMSC.buildingDetails(section_id, res_valid[0]);
 		}
-		infoWindowContent = '<div class="infowindow"><h3><span class="tputext">'+section_title+' for town planning unit '+o["row"]["tpu"]["value"]+'/'+o["row"]["sb_vc"]["value"]+'</span> <span class="nbres">('+res_valid.length+' '+res_str+')</span></h3><table><thead><tr><th>Address</th><th>Monthly digest</th><th>Building type</th>' + bldg_costs_header + '</tr></thead><tbody>' + infoWindowContent + '</tbody></table></div>';
+		infoWindowContent = '<div class="infowindow"><h3><span class="tputext">'+section_title+' for town planning unit '+o["row"]["tpu"]["value"]+'/'+o["row"]["sb_vc"]["value"]+'</span> <span class="nbres">('+res_valid.length+' '+res_str+')</span></h3><table><thead><tr><th>Address</th><th>Month</th><th>Building type</th>' + bldg_costs_header + '<th>Source</th></tr></thead><tbody>' + infoWindowContent + '</tbody></table></div>';
+		break;
+	    case "lands":
+	        infoWindowContent = "";
+		break;
+	    case "tpb":
+		infoWindowContent = "";
 		break;
 	    case "census":
 		var population_nb = "";
@@ -1117,6 +1420,8 @@ var JMSC = {
 		var unit = "";
 		if (JMSC.currentLayerData["unit"]) unit = JMSC.currentLayerData["unit"];
 		if ($.inArray(unit, JMSC.numericalUnits)>=0) value = addCommas(value);
+		if ($.inArray(unit, JMSC.dateUnits)>=0) unit = "(" + unit.toLowerCase() + ")";
+		if ($.inArray(unit, JMSC.dateUnits)>=0) value = JMSC.numMonthToTextMonth(value);
 		infoWindowContent += "<h5>" + layertitle + "</h5>";
 		infoWindowContent += '<div class="infowindow-val"><span>'+ value +'</span> ' + unit + '</div>';
 		if (population_nb.length > 0) {
@@ -1138,6 +1443,7 @@ var JMSC = {
 	JMSC.openedInfoWindow.open(JMSC.map);
 	google.maps.event.addListener(JMSC.openedInfoWindow, 'domready', function() {
 	    JMSC.loadInfoWindowGraph(o);
+	    JMSC.hideLoadingBar();
 	});
 	google.maps.event.addListener(JMSC.openedInfoWindow, 'closeclick', function() {
 	    JMSC.closeSidePanel();
@@ -1168,15 +1474,41 @@ var JMSC = {
 	else if (JMSC.geotype == "point") JMSC.loadOverlappingData(o);
 	else if (JMSC.geotype == "bb") JMSC.loadBuildingBlockData(o);
     },
+    loadDescText: function() {
+	if (JMSC.currentLayerData.desctext !== undefined && JMSC.currentLayerData.desctext.length > 0) {
+	    sp = $("#sidepanel");
+	    JMSC.openSidePanel(450, 120);
+	    sp.html(JMSC.currentLayerData.desctext);
+	}
+    },
+    loadLegend: function() {
+	$.log("loadLegend()");
+	//$.log(JMSC.currentLayerData);
+	if (JMSC.currentLayerData.legendtext !== undefined && JMSC.currentLayerData.legendcolors !== undefined) {
+	    var legtexts = JMSC.currentLayerData.legendtext.split("|");
+	    var legcolors = JMSC.currentLayerData.legendcolors.split("|");
+	    if (legcolors.length > 0) {
+		for (var i=0; i<legtexts.length; i++) {
+		    var n = i;
+		    if (legcolors[i] == undefined || (legcolors[i].length != 6 && legcolors[i].length != 3)) continue;
+		    $("#legline-"+n).show();
+		    $("#legend-"+n).css("background-color","#"+legcolors[i]);
+	    	    $("#legend-"+n).attr("title", legtexts[i]);
+    		    $("#legtext-"+n).html(legtexts[i]);
+		}
+	    }
+	}
+    },
     gearthLayer: function() {
 	$.log("gearthLayer");
-	if (!JMSC.mode3d) {
+	/*if (!JMSC.mode3d) {
 	    JMSC.loadKml2d();
-	}
+	}*/
+	JMSC.loadLegend();
     },
     tpbLayer: function() {
 	$.log("tpbLayer");
-	JMSC.fusionTableOpts.suppressInfoWindows = false;
+	JMSC.fusionTableOpts.suppressInfoWindows = true;
     },
     buildingsLayer: function() {
 	//$.log("buildingsLayer");
@@ -1390,7 +1722,7 @@ var JMSC = {
 			if (i == 0) {
 			    $("#legtext-0").html("Less than $"+addCommas(min+step));
 			} else if (i+1 == JMSC.stylesNbMax) {
-			    $("#legtext-"+i).html("$"+addCommas(max+step)+" or more");
+			    $("#legtext-"+i).html("$"+addCommas(max-step)+" or more");
 			} else {
 			    $("#legtext-"+i).html("$"+bottomVal+"-$"+topVal);
 			}
@@ -1403,12 +1735,34 @@ var JMSC = {
 			    $("#legtext-"+i).html(bottomVal+"% or more");
 			}
 		    } else {
+			var isDateUnit = $.inArray(JMSC.currentLayerData["unit"], JMSC.dateUnits)>=0;
+			var isHeightUnit = $.inArray(JMSC.currentLayerData["unit"], JMSC.heightUnits)>=0;
 			if (i == 0) {
-			    $("#legtext-0").html("Less than "+addCommas(min+step));
+			    var lessThanVal = min+step;
+			    //if (typeof lessThanVal === 'number' && lessThanVal % 1 == 0) lessThanVal -= 1;
+			    if ($.inArray(JMSC.currentLayerData["unit"], JMSC.numericalUnits)>=0) lessThanVal = addCommas(lessThanVal); 
+			    $("#legtext-0").html("Less than "+lessThanVal);
+			    if (isDateUnit && JMSC.currentLayerData["unit"] == "MONTH") {
+				lessThanVal = Math.floor(Number(lessThanVal) / 100);
+			    }
+			    if (isDateUnit) $("#legtext-0").html("Before " + lessThanVal);
+			    if (isHeightUnit) $("#legtext-0").html("Below " + lessThanVal + " " + JMSC.currentLayerData["unit"].toLowerCase());
 			} else if (i+1 < JMSC.stylesNbMax) {
+			    if (typeof topVal === 'number' && topVal % 1 == 0) topVal -= 1;
+			    if (isDateUnit && JMSC.currentLayerData["unit"] == "MONTH") {
+				bottomVal = Math.floor(Number(bottomVal) / 100);
+				topVal = Math.floor(Number(topVal) / 100);
+			    }
 			    $("#legtext-"+i).html(bottomVal+"-"+topVal);
+			    if (isHeightUnit) $("#legtext-"+i).html("" + bottomVal + "-" + topVal + " " + JMSC.currentLayerData["unit"].toLowerCase());
 			} else {
 			    $("#legtext-"+i).html(bottomVal+" or more");
+			    if (isDateUnit && JMSC.currentLayerData["unit"] == "MONTH") {
+				bottomVal = Math.floor(Number(bottomVal) / 100);
+				topVal = Math.floor(Number(topVal) / 100);
+			    }
+			    if (isDateUnit) $("#legtext-"+i).html("" + bottomVal + " or after");
+			    if (isHeightUnit) $("#legtext-"+i).html("Above " + bottomVal + " " + JMSC.currentLayerData["unit"].toLowerCase());
 			}
 		    }
 		} else {
@@ -1419,10 +1773,10 @@ var JMSC = {
 	    }
 	    //$("#legtext-"+JMSC.stylesNbMax).html(">"+max);
 	    //$.log(JMSC.currentLayerData);
-	    //if (JMSC.currentLayerData["unit"] !== undefined) $("#legunit").html(JMSC.currentLayerData["unit"]);
+	    if (JMSC.currentLayerData["unit"] !== undefined) $("#legunit").html(JMSC.currentLayerData["unit"]);
 	}
 	JMSC.fusionTableOpts.styles = newStyles;
-	$.log(JMSC.fusionTableOpts.styles);
+	//$.log(JMSC.fusionTableOpts.styles);
     },
     changeLayerOptions: function() { // Set new layer opts and draw map
 	$.log("changeLayerOptions()");
@@ -1435,9 +1789,10 @@ var JMSC = {
 	    filters = JMSC.currentLayerData.filters.split(",");
 	}
 	if ($.inArray(JMSC.currentFilter, filters) < 0) {
-	    $.log($.inArray(JMSC.currentFilter, filters));
 	    JMSC.currentFilter = null;
-	    JMSC.clearLegend();
+	    if (JMSC.currentLayerData.legendtexts !== undefined) {
+		JMSC.clearLegend();
+	    }
 	}
 	if (JMSC.currentLayerData.geo == "bb") {
 	    JMSC.fusionTableOpts.suppressInfoWindows = false;
@@ -1445,6 +1800,7 @@ var JMSC = {
 	} else {
 	    JMSC.fusionTableOpts.suppressInfoWindows = true;
 	}
+	JMSC.clearLegend();
 	switch (JMSC.currentLayerData.section) {
 	    case "buildings":
 		JMSC.fusionTableOpts.query.select = "bounds";
@@ -1455,6 +1811,7 @@ var JMSC = {
 		$(".slitext.range").show();
 		$(".filters-container").show();
 		break;
+	    case "lands":
 	    case "census":
 		JMSC.fusionTableOpts.query.select = "boundary";
 		JMSC.censusLayer();
@@ -1465,7 +1822,7 @@ var JMSC = {
 		$(".filters-container").hide();
 		break;
 	    case "googleearth":
-		//JMSC.gearthLayer();
+		JMSC.gearthLayer();
 	    case "tpb":
 		JMSC.tpbLayer();
 	    default:
@@ -1482,20 +1839,21 @@ var JMSC = {
 	if (JMSC.openedInfoWindow != null) {
 	    JMSC.openedInfoWindow.close();
 	}
+	JMSC.setMapType();
 	JMSC.closeSidePanel();
 	JMSC.clearBounds(null);
 	JMSC.resetGeoIds();
     },
     changeYearMenu: function(e) {
 	//$.log("changeYearMenu()");
-	var y = parseInt(JMSC.yearSlider.slider("value"));
+	var yi = parseInt(JMSC.yearSlider.slider("value"));
 	if (JMSC.currentLayerData==null) return 0;
 	JMSC.thisLayer = JMSC.currentLayerData["mylayerid"]; // the name of layer (spans many years)
 	var oldLayerData = JMSC.currentLayerData;
 	var changed = false;
 	for (var i=0; i<JMSC.layermenu.length; i++) {
 	    if (JMSC.layermenu[i]["mylayerid"] == JMSC.thisLayer &&
-	    (((JMSC.currentLayerData.section == undefined || JMSC.currentLayerData == "census" || $("#"+JMSC.layerMenuId).val().search(/YYYY$/)>=0) && parseInt(JMSC.layermenu[i]["year"]) == y) ||
+	    (((JMSC.currentLayerData.section == undefined || JMSC.currentLayerData == "census" || $("#"+JMSC.layerMenuId).val().search(/YYYY$/)>=0) && parseInt(JMSC.findYearSliderIndex(JMSC.layermenu[i]["year"])) == yi) ||
 	    JMSC.currentLayerData.section == "buildings")) {
 		JMSC.currentLayerData = JMSC.layermenu[i];
 		JMSC.currentLayerId = JMSC.currentLayerData["id"];
@@ -1517,19 +1875,18 @@ var JMSC = {
 		} else {
 		    JMSC.geotype = null;
 		}
-		JMSC.year = y;
+		JMSC.year = JMSC.years[yi];
 		break;
 	    }
 	}
 	if (!changed && oldLayerData["year"] !== undefined) {
 	    JMSC.yearSlider.slider({change: function(event, ui) {return 0;}});
-	    JMSC.yearSlider.slider("value", oldLayerData["year"]); // creates a loop if you don't pause the event listening...
+	    JMSC.yearSlider.slider("value", JMSC.findYearSliderIndex(oldLayerData["year"])); // creates a loop if you don't pause the event listening...
 	    JMSC.yearSlider.slider({change: JMSC.changeYearMenu});
 	}
 	if (changed) {
 	    JMSC.changeLayerOptions();
 	    //JMSC.clearLegend();
-	    JMSC.kmlLayerOpts.preserveViewport = true;
 	    if (JMSC.currentLayerData["3d"] !== undefined) {
 		if (google.earth.isSupported()) {
 		    JMSC.mode3d = true;
@@ -1548,6 +1905,7 @@ var JMSC = {
 		    JMSC.mode3d = false;
 		}
 	    }
+	    JMSC.loadDescText();
 	    // Setting the URL of the page
 	    document.location.href =  JMSC.siteUrl + "#" + JMSC.currentLayerId;
 	}
@@ -1556,11 +1914,22 @@ var JMSC = {
 	latLng = new google.maps.LatLng(place.lat, place.lng);
 	if (JMSC.mode3d) {
 	    if (JMSC.ge !== null) {
+		$.log(place);
+		//zoom = Math.round(26-(Math.log(range)/Math.log(2)));
+		//Math.log(range) = (26 - zoom) * Math.log(2);
 		var lookAt = JMSC.ge.getView().copyAsLookAt(JMSC.ge.ALTITUDE_RELATIVE_TO_GROUND);
-		lookAt.setLatitude(place.lat-0.01);
-		lookAt.setLongitude(place.lng+0.015);
-		lookAt.setRange(5000);
-		lookAt.setTilt(45);
+		lookAt.setLatitude(place.lat);
+		lookAt.setLongitude(place.lng);
+		if (place.range !== undefined) {
+		    lookAt.setRange(Number(place.range));
+		} else {
+		    lookAt.setRange(JMSC.geDefaultParams.range);
+		}
+		if (place.tilt !== undefined) {
+		    lookAt.setTilt(Number(place.tilt));
+		} else {
+		    lookAt.setTilt(JMSC.geDefaultParams.tilt);
+		}
 		JMSC.ge.getView().setAbstractView(lookAt);
 	    }
 	} else {
@@ -1574,6 +1943,7 @@ var JMSC = {
     },
     zoomToPlace: function() {
 	found = false;
+	child = false;
 	//$.log("zoom to place");
 	//$.log(JMSC.currentLayerData);
 	for (var i=0; i<JMSC.placesmenu.length; i++) {
@@ -1582,9 +1952,22 @@ var JMSC = {
 		JMSC.zoomTo(place);
 		$("#place-" + JMSC.currentLayerData.place).parent().addClass("selected");
 		found = true;
+		if (place["parent"] !== undefined) child = place["parent"];
 		break;
 	    }
 	}
+	if (child !== false) {
+	$.log(child !== false);
+	    for (var i=0; i<JMSC.placesmenu.length; i++) {
+		$.log(JMSC.placesmenu[i].id);
+		if (JMSC.placesmenu[i].id == child) {
+		    $("#place-" + child).parent().addClass("selected");
+		    found = true;
+		    break;
+		}
+	    }
+	}
+	return found;
     },
     selectPlacesMenu: function(e) {
 	var found = false;
@@ -1609,9 +1992,22 @@ var JMSC = {
 	    }
 	}
 	if (!found) {
-	    latLng = new google.maps.LatLng(JMSC.latCenter, JMSC.lngCenter);
-	    JMSC.map.setCenter(latLng);
-	    JMSC.map.setZoom(JMSC.zoomStart);
+	    if (JMSC.mode3d) {
+		if (JMSC.ge !== null) {
+		    //zoom = Math.round(26-(Math.log(range)/Math.log(2)));
+		    //Math.log(range) = (26 - zoom) * Math.log(2);
+		    var lookAt = JMSC.ge.getView().copyAsLookAt(JMSC.ge.ALTITUDE_RELATIVE_TO_GROUND);
+		    lookAt.setLatitude(JMSC.latCenter);
+		    lookAt.setLongitude(JMSC.lngCenter);
+		    lookAt.setRange(JMSC.geDefaultParams.range*25);
+		    lookAt.setTilt(JMSC.geDefaultParams.tilt);
+		    JMSC.ge.getView().setAbstractView(lookAt);
+		}
+	    } else {
+		latLng = new google.maps.LatLng(JMSC.latCenter, JMSC.lngCenter);
+		JMSC.map.setCenter(latLng);
+		JMSC.map.setZoom(JMSC.zoomStart);
+	    }
 	}
     },
     changeLayerMenu: function(e) {
@@ -1624,23 +2020,28 @@ var JMSC = {
 	//JMSC.currentFilter = null;
 	var value = $("#"+JMSC.layerMenuId).val();
 	var value_base = value;
+	$.log("year:");
+	$.log(JMSC.year);
+	$.log(value);
 	if (value.search(/\d+$/)>=0) {
 	    m = value.match(/(\d+)$/);
 	    if (m) {
 		JMSC.year = parseInt(m[1]);
-		JMSC.yearSlider.slider("value", JMSC.year);
+		JMSC.yearSlider.slider("value", JMSC.findYearSliderIndex(JMSC.year));
 		value_base = value.replace(""+JMSC.year, "");
 	    }
 	    $("#year-slider").show();
 	    $(".slitext.years").show();
 	} else if (value.search(/YYYY$/)>=0) {
 	    isconsolidated = true;
+	    if (JMSC.year == null || JMSC.year == "") {
+		JMSC.year = "";
+	    }
 	    value_base = value.replace(/YYYY$/, "");
 	    value = value.replace(/YYYY$/, JMSC.year);
 	    $("#year-slider").show();
 	    $(".slitext.years").show();
 	}
-	$.log(value_base);
 	var oldFusionTableId = JMSC.fusionTableId;
 	var oldSection = JMSC.currentSection;
 	var oldFilter = JMSC.currentFilter;
@@ -1655,16 +2056,12 @@ var JMSC = {
 	    $("#"+JMSC.layerMenuId + " option").each(function(i, el) {
 		availLayers[i] = el.value;
 	    });
+	    $.log(value_base);
+	    $.log(availLayers);
     	    if ($.inArray(value_base + "YYYY", availLayers)) { // not found yet, search again if consolidated
-		for (var i=JMSC.years.length-1; i>=0; i--) {
-		    var value_year = value_base + JMSC.years[i];
-		    for (var j=0; j<JMSC.layermenu.length; j++) {
-			if (JMSC.layermenu[j]["id"] == value_year) {
-			    JMSC.currentLayerData = JMSC.layermenu[j];
-			    break;
-			}
-		    }
-		    if (JMSC.currentLayerData !== null) {
+		for (var i=0; i<JMSC.layermenu.length; i++) {
+		    if (JMSC.layermenu[i]["id"].replace(/\d+/, "") == value_base) {
+			JMSC.currentLayerData = JMSC.layermenu[i];
 			break;
 		    }
 		}
@@ -1715,7 +2112,7 @@ var JMSC = {
 	    }
 	    if (JMSC.currentLayerData.place !== undefined) {
 		if (JMSC.poi.id !== JMSC.currentLayerData.place) {
-		    JMSC.zoomToPlace();
+		    found = JMSC.zoomToPlace();
 		}
 	    }
 	    var years = JMSC.yearsDefault;
@@ -1755,9 +2152,9 @@ var JMSC = {
 	    if (JMSC.ge!==null) {
 	    }
 	} else {
-	    JMSC.kmlLayerOpts.preserveViewport = false;
 	    JMSC.load2d();
 	}
+	JMSC.loadDescText();
 
 	// Setting the URL of the page
 	document.location.href =  JMSC.siteUrl + "#" + JMSC.currentLayerId;
@@ -1794,7 +2191,6 @@ var JMSC = {
 		JMSC.buildingsLayer();
 		break;
 	}
-	$.log(value);
 	JMSC.closeSidePanel();
 	JMSC.clearBounds(null);
 	JMSC.resetGeoIds();
@@ -1888,6 +2284,9 @@ var JMSC = {
 	    } else {
 		opt.attr("name", value);
 	    }
+	    if (place["parent"] !== undefined) {
+		opt.hide();
+	    }
 	    placesMenu.append(opt);
 	}
     },
@@ -1907,16 +2306,12 @@ var JMSC = {
 	    var isconsolidated = false;
 	    if (JMSC.layermenu[i]["id"] == undefined) continue;
 	    var jump = 0;
-	    if (i+2<JMSC.layermenu.length&&
-	    (JMSC.layermenu[i]["mylayerid"]==JMSC.layermenu[i+1]["mylayerid"]||
-	    JMSC.layermenu[i]["mylayerid"]==JMSC.layermenu[i+2]["mylayerid"])) {
+	    var ii = i + 1;
+	    var thisLayerId = JMSC.layermenu[i]["mylayerid"];
+	    while (ii + 1 < JMSC.layermenu.length && JMSC.layermenu[ii]["id"] !== undefined && thisLayerId == JMSC.layermenu[ii]["mylayerid"]) {
 		isconsolidated = true;	
-		if (JMSC.layermenu[i]["mylayerid"]==JMSC.layermenu[i+1]["mylayerid"]&&
-		JMSC.layermenu[i]["mylayerid"]==JMSC.layermenu[i+2]["mylayerid"]) {
-		    jump = 2;
-		} else if (JMSC.layermenu[i]["mylayerid"]==JMSC.layermenu[i+1]["mylayerid"]) {
-		    jump = 1;
-		}
+		jump = ii - i;
+		ii += 1;
 	    }
 	    var value = JMSC.layermenu[i]["id"];
 	    var classname = "";
@@ -1929,8 +2324,8 @@ var JMSC = {
 		label = JMSC.layermenu[i]["id"];
 	    }
 	    if (isconsolidated) {
-		value = value.replace(/2001$/, 'YYYY');
-		label = label.replace(/, 2001$/, '');
+		value = value.replace(/\d+$/, 'YYYY');
+		label = label.replace(/, \d+$/, '');
 	    }
 	    var opt = $('<option>' + label + '</option>');
 	    if (JMSC.layermenu[i]["header"]) {
@@ -1946,11 +2341,9 @@ var JMSC = {
 	}
     },
     populateLegend: function() {
-	var c = $("#bottom");
 	//var container = $('<div></div>');
-	var container = $('<fieldset><legend>Legend</legend></fieldset>');
-	container.attr("id", "legend-colors");
-	container.addClass("legend-container");
+	var container = $('#legend');
+	contents = $('<fieldset><legend>Legend</legend></fieldset>');
 	for (var i=0; i<JMSC.stylesNbMax+1; i++) {
 	    var n = i;
 	    if (i == JMSC.stylesNbMax) n = "n";
@@ -1967,7 +2360,7 @@ var JMSC = {
 	    //legendblock.css("left", JMSC.sliderStepPx*i-15+"px");
 	    legline.append(legendblock);
 	    legline.append(legtext);
-	    container.append(legline);
+	    contents.append(legline);
 	    legline.hide();
 	}
 	var legtext = $('<div></div>');
@@ -1975,14 +2368,26 @@ var JMSC = {
 	legtext.addClass('legtext');
 	legtext.attr("id", "legtext-"+JMSC.stylesNbMax);
 	legtext.css("left", -10+"px");
-	//container.append(legtext);
+	//contents.append(legtext);
 	var legunit = $('<div></div>');
 	legunit.html("");
 	legunit.addClass('legunit');
 	legunit.attr("id", "legunit");
 	legunit.css("left", -10+"px");
-	container.append(legunit);
-	c.append(container);
+	contents.append(legunit);
+	container.append(contents);
+    },
+    findYearSliderIndex: function(val) {
+	sliderVal = JMSC.years.length-1; //0
+	if (val !== null && val > 0) {
+	    for (var i=0; i<JMSC.years.length; i++) {
+		if (val == JMSC.years[i]) {
+		    sliderVal = i;
+		    break;
+		}
+	    }
+	}
+	return sliderVal;
     },
     populateYearSlider: function() {
 	var c = $("#controls");
@@ -1991,20 +2396,17 @@ var JMSC = {
 	var slidr = $('<div id="year-slider"></div>');
 	container.append(slidr);
 	c.append(container);
+	sliderVal = JMSC.findYearSliderIndex(JMSC.year);
+	$.log(sliderVal);
 	JMSC.yearSlider = $("#year-slider").slider({
 	    change: JMSC.changeYearMenu,
 	    animate: true,
-	    min: JMSC.years[0],
-	    max: JMSC.years[JMSC.years.length-1],
-	    value: JMSC.year,
-	    step: (JMSC.years[JMSC.years.length-1] - JMSC.years[0]) / (JMSC.years.length-1)
+	    min: 0,//JMSC.years[0],
+	    max: JMSC.years.length-1,//JMSC.years[JMSC.years.length-1],
+	    value: sliderVal,
+	    step: 1//(JMSC.years[JMSC.years.length-1] - JMSC.years[0]) / (JMSC.years.length-1)
 	});
-	$.log(JMSC.years[JMSC.years.length-1]);
-	$.log(JMSC.years[0]);
-	$.log(JMSC.years.length-1);
-	$.log((JMSC.years[JMSC.years.length-1] - JMSC.years[0]) / 1);
-	$.log((JMSC.years[JMSC.years.length-1] - JMSC.years[0]) / JMSC.years.length-1)
-	var len = JMSC.sliderStepPx*(JMSC.years.length-1);
+	var len = (27+JMSC.sliderStepPx)*(JMSC.years.length-1);
 	slidr.css("width", len+"px");
 	for (var i=0; i<JMSC.years.length; i++) {
 	    stepPx = JMSC.sliderStepPx;
@@ -2021,7 +2423,8 @@ var JMSC = {
 	container.addClass("sliders-container");
 	var rangeslidr = $('<div id="range-slider"></div>');
 	container.append(rangeslidr);
-	$("#layermenu-container").after(container);
+	c.append(container);
+	//$("#layermenu-container").after(container);
 	JMSC.preInitRangeSlider();
 	JMSC.rangeSlider = $("#range-slider").slider({
 	    range: true,
@@ -2134,10 +2537,10 @@ var JMSC = {
 		m = layerid.match(/(\d+)$/);
 		if (m) {
 		    JMSC.year = parseInt(m[1]);
-		    JMSC.yearSlider.slider("value", JMSC.year);
+		    JMSC.yearSlider.slider("value", JMSC.findYearSliderIndex(JMSC.year));
 		}
 	    } else if (layerid.search(/YYYY$/)) {
-		layerid = layerid.replace(/YYYY$/,JMSC.year);
+		layerid = layerid.replace(/YYYY$/, JMSC.year);
 	    }
 	    var availLayers = [];
 	    $("#"+JMSC.layerMenuId + " option").each(function(i, el) {
@@ -2157,6 +2560,16 @@ var JMSC = {
     },
     numberWithCommas: function(x) {
 	return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    },
+    findIndexFromValue: function(val, cols) {
+	var index = -1;
+	for (var i=0; i<cols.length; i++) {
+	    if (cols[i] == val) {
+		index = i;
+		break;
+	    }
+	}
+	return index;
     }
 };
 $(document).ready(function() {
